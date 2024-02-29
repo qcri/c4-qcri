@@ -31,7 +31,11 @@ mkdir -p download_and_split
 if [ ! -s "download_and_split/input.txt" ]; then
     for CC_VERSION in "${CC_VERSIONS[@]}";
     do
-        zcat wet.paths/${CC_VERSION}.wet.paths.gz
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            gzcat wet.paths/${CC_VERSION}.wet.paths.gz
+        else
+            zcat wet.paths/${CC_VERSION}.wet.paths.gz
+        fi
     done >> download_and_split/input.txt
 fi
 
