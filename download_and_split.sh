@@ -21,7 +21,7 @@ do
     fi
     python3 split_wet_file.py "$DOWNLOADED"
   fi
-  if [ -s "$OUTPUT"]; then
+  if [ -s "$OUTPUT" ]; then
     rm -f "$DOWNLOADED"
   fi
 done
