@@ -13,10 +13,11 @@ awk "NR >= $1 && NR <= $2" "download_and_split/input.txt" | \
 do
   # download wet file
   DOWNLOADED="download_and_split_$3/$(basename $LINE)"
-  if [ ! -s "$DOWNLOADED" ]; then
-    wget -q -O "$DOWNLOADED" "https://data.commoncrawl.org"/${LINE}
-  fi
+
   if [ ! -s "${DOWNLOADED%gz}pages.jsons.gz"]; then
+    if [ ! -s "$DOWNLOADED" ]; then
+      wget -q -O "$DOWNLOADED" "https://data.commoncrawl.org"/${LINE}
+    fi
     python3 split_wet_file.py "$DOWNLOADED"
   fi
   if [ -s "${DOWNLOADED%gz}pages.jsons.gz"]; then
