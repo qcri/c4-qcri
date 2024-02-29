@@ -2,24 +2,26 @@
 
 CC_VERSIONS=(
  "2022-33"
- "2022-40"
- "2022-49"
- "2023-06"
- "2023-14"
- "2023-23"
- "2023-40"
- "2023-50"
+#  "2022-40"
+#  "2022-49"
+#  "2023-06"
+#  "2023-14"
+#  "2023-23"
+#  "2023-40"
+#  "2023-50"
 )
 
 
 DOWNLOAD_HOST="https://data.commoncrawl.org"
 WET_PATH_URL="https://data.commoncrawl.org/crawl-data/CC-MAIN-CC-VERSION/wet.paths.gz"
 
+date '+%Y-%m-%d %H:%M:%S'
+
 mkdir -p wet.paths
 for CC_VERSION in "${CC_VERSIONS[@]}";
 do
     if [[ ! -s "wet.paths/${CC_VERSION}.wet.paths.gz" ]]; then
-        wget -O wet.paths/${CC_VERSION}.wet.paths.gz ${WET_PATH_URL/CC-VERSION/${CC_VERSION}}
+        wget -q -O wet.paths/${CC_VERSION}.wet.paths.gz ${WET_PATH_URL/CC-VERSION/${CC_VERSION}}
     fi
 done
 
@@ -49,3 +51,7 @@ for ((i = 0; i < NUM_TASKS; i++)); do
 
     ./download_and_split.sh $START_LINE $END_LINE $i &
 done
+
+wait
+
+date '+%Y-%m-%d %H:%M:%S'
