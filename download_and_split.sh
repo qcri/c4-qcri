@@ -6,6 +6,9 @@ awk "NR >= $1 && NR <= $2" "download_and_split/input.txt" | while read LINE;
 do
   # download wet file
   mkdir -p download_and_split_$3
-  wget -O download_and_split_$3/$(basename $LINE) "https://data.commoncrawl.org"/${LINE}
-  python split_wet_file.py download_and_split_$3/$(basename $LINE)
+  DOWNLOADED="download_and_split_$3/$(basename $LINE)"
+  if [ ! -s "$DOWNLOADED" ]; then
+    wget -O "$DOWNLOADED" "https://data.commoncrawl.org"/${LINE}
+  fi
+  python3 split_wet_file.py "$DOWNLOADED"
 done
