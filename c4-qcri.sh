@@ -47,5 +47,5 @@ for ((i = 0; i < NUM_TASKS; i++)); do
         END_LINE=$((END_LINE + EXTRA_LINES))
     fi
 
-    ./download_and_split.sh START_LINE $((START_LINE + 2)) $i &
+    ./download_and_split.sh $START_LINE $END_LINE $i &
 done

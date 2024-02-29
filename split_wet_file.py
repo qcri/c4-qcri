@@ -61,14 +61,12 @@ def split_pages(wet_file_path):
       if line.startswith(_URL_KEY):
         page.url = line[len(_URL_KEY) :].strip()
         page.normalized_url = normalize_url(line[len(_URL_KEY) :].strip())
-        print(page.normalized_url)
 
       if line.startswith(_URL_DATE):
         page.timestamp = line[len(_URL_DATE) :].strip()
 
       if line.startswith(_LANGUAGE):
         page.language = line[len(_LANGUAGE) :].strip()
-        print(page.language)
 
       if line.startswith(_CONTENT_TYPE):
         page.content_type = line[len(_CONTENT_TYPE) :].strip()
@@ -87,8 +85,14 @@ def split_pages(wet_file_path):
       yield page
 
 with gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt") as o:
+  total = 0
+  count = 0
+
   for page in split_pages(wet_file_path):
-    print(page.url, page.language)
+    total += 1
     if page.language and 'ara' in page.language.split(','):
+      count += 1
       o.write(json.dumps(dataclasses.asdict(page)))
       o.write("\n")
+
+  logging.info("%d/%d extracted", count, total)
