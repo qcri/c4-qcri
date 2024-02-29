@@ -8,7 +8,7 @@ do
   mkdir -p download_and_split_$3
   DOWNLOADED="download_and_split_$3/$(basename $LINE)"
   if [ ! -s "$DOWNLOADED" ]; then
-    wget q -O "$DOWNLOADED" "https://data.commoncrawl.org"/${LINE}
+    wget -q -O "$DOWNLOADED" "https://data.commoncrawl.org"/${LINE}
   fi
   python3 split_wet_file.py "$DOWNLOADED"
 done
