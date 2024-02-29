@@ -84,7 +84,7 @@ def split_pages(wet_file_path):
     if _validate_features(page):
       yield page
 
-with gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt") as o:
+with gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt", encoding="utf8") as o:
   total = 0
   count = 0
 
@@ -92,7 +92,7 @@ with gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt") as o:
     total += 1
     if page.language and 'ara' in page.language.split(','):
       count += 1
-      o.write(json.dumps(dataclasses.asdict(page)))
+      o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
       o.write("\n")
 
   logging.info("%d/%d extracted", count, total)
