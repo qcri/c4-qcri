@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import gzip
@@ -10,6 +11,9 @@ from typing import Optional, Iterable, Mapping, Sequence
 import tensorflow_datasets as tfds
 from tensorflow_datasets.text import c4_utils
 import tensorflow as tf
+
+
+_SCRIPT_DIR=os.path.dirname(os.path.realpath(__file__))
 
 
 # Filters
@@ -265,7 +269,7 @@ def get_hashed_url_filter_fn(predicate_fn):
   
 def load_badwords():
   badwords = collections.defaultdict(set)
-  with open('ar-badwords.txt', 'rt') as f:
+  with open(os.path.join(_SCRIPT_DIR, 'ar-badwords.txt'), 'rt') as f:
     badwords['ar'].update(x.strip() for x in f)
   return badwords
 
