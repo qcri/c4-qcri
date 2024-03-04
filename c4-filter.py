@@ -7,27 +7,16 @@ import dataclasses
 import hashlib
 import collections
 from typing import Optional, Iterable, Mapping, Sequence
-import typer
 import tensorflow_datasets as tfds
 from tensorflow_datasets.text import c4_utils
 import tensorflow as tf
-
-
-# WET file constants
-_PAGE_DELIMITER = "WARC/1.0"
-_URL_KEY = "WARC-Target-URI:"
-_URL_DATE = "WARC-Date:"
-_LANGUAGE = "WARC-Identified-Content-Language:"
-_CONTENT_TYPE = "Content-Type:"
-_CONTENT_LEN = "Content-Length:"
-_METADATA_PREFIXES = ("WARC", "CONTENT-", "Content-")
 
 
 # Filters
 _MIN_WORDS_PER_LINE = 5
 _MIN_NUM_SENTENCES = 3
 _MAX_WORD_LENGTH = 1000
-_END_MARKS = (".", "?", "!", '"')
+_END_MARKS = (".", "?", "!", '"')    # FIXME add Arabic
 _ELLIPSIS = "..."
 _POLICY_SUBSTRINGS = [
     "terms of use",
@@ -68,50 +57,6 @@ def normalize_url(url):
 line_delimiter = '\n'
 
 
-def _validate_features(page):
-  if page.url and page.text and page.timestamp:
-    return True
-  return False
-
-def split_pages(wet_file_path):
-  with gzip.open(wet_file_path, mode="rt") as f:
-    page = PageFeatures()
-    for i, line in enumerate(f.readlines()):
-      line = line.strip()
-      if not line:
-        continue
-      if line == _PAGE_DELIMITER:
-        if i > 0 and _validate_features(page):
-          yield page
-        page = PageFeatures()
-
-      if line.startswith(_URL_KEY):
-        page.url = line[len(_URL_KEY) :].strip()
-        page.normalized_url = normalize_url(line[len(_URL_KEY) :].strip())
-
-      if line.startswith(_URL_DATE):
-        page.timestamp = line[len(_URL_DATE) :].strip()
-
-      if line.startswith(_LANGUAGE):
-        page.language = line[len(_LANGUAGE) :].strip()
-
-      if line.startswith(_CONTENT_TYPE):
-        page.content_type = line[len(_CONTENT_TYPE) :].strip()
-
-      if line.startswith(_CONTENT_LEN):
-        page.content_length = line[len(_CONTENT_LEN) :].strip()
-
-      if line.startswith(_METADATA_PREFIXES):
-        continue
-
-      if page.text:
-        page.text += line_delimiter
-      page.text += line
-
-    if _validate_features(page):
-      yield page
-
-
 counts = {}
 
 def counter_inc_fn(name):
@@ -119,9 +64,52 @@ def counter_inc_fn(name):
 
 
 def get_counter_inc_fn(counter_name):
-  return lambda a: print(a)
+  return print
 
-app = typer.Typer()
+
+def is_javascript_code(text):
+    # Count occurrences of specific characters
+    count_open_parenthesis = text.count('(')
+    count_close_parenthesis = text.count(')')
+    count_dollar_sign = text.count('$')
+    count_semicolon = text.count(';')
+    count_equals = text.count('=')
+    count_equals = text.count('{')
+    count_equals = text.count('}')
+    count_equals = text.count('+')
+    count_equals = text.count('_')
+    count_equals = text.count("'")
+    count_equals = text.count('"')
+    count_equals = text.count('#')
+    count_equals = text.count('/')
+    
+    # Calculate the total number of characters
+    total_characters = len(text)
+    
+    # Calculate the total count of specific characters
+    total_count = (count_open_parenthesis + count_close_parenthesis +
+                   count_dollar_sign + count_semicolon + count_equals)
+    
+    # Calculate the percentage of the total count relative to the total characters
+    percentage_total_count = (total_count / total_characters) * 100
+    
+    # Check if the percentage exceeds 8%
+    if percentage_total_count > 8:
+        return True
+    else:
+        return False
+
+
+def contains_arabic(text):
+    # Regular expression pattern to match Arabic characters
+    arabic_pattern = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+')
+    
+    # Check if the pattern matches the text
+    if arabic_pattern.search(text):
+        return True
+    else:
+        return False
+
 
 def clean_page(
     page: PageFeatures,
@@ -163,6 +151,12 @@ def clean_page(
   valid_lines = []
   num_sentences = 0
 
+  def line_is_arabic(line):
+    return contains_arabic(line)
+
+  def line_is_code(line):
+    return is_javascript_code(line)
+
   def line_has_too_long_word(line):
     for word in line.split():
       if len(word) > max_word_length:
@@ -171,8 +165,15 @@ def clean_page(
 
   for line in lines:
     line = line.strip()
+    print(line)
+    if not line_is_arabic(line):
+      counter_inc_fn("line-filtered:not_arabic")
+      continue
     if line_has_too_long_word(line):
       counter_inc_fn("line-filtered:too_long_word")
+      continue
+    if line_is_code(line):
+      counter_inc_fn("line-filtered:code")
       continue
     line = citation_regex.sub("", line)
     if not line.endswith(_END_MARKS) or line.endswith(_ELLIPSIS):
@@ -208,23 +209,6 @@ def clean_page(
     return
   counter_inc_fn("passed")
   return dataclasses.replace(page, text=line_delimiter.join(valid_lines).strip())
-
-
-@app.command()
-def split_wet_files(wet_file_path: str):
-  logging.info("Splitting file: %s", wet_file_path)
-  with gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt", encoding="utf8") as o:
-    total = 0
-    count = 0
-
-    for page in split_pages(wet_file_path):
-      total += 1
-      if page.language and 'ara' in page.language.split(','):
-        count += 1
-        o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
-        o.write("\n")
-
-    logging.info("%d/%d extracted", count, total)
 
 
 class PredictLanguage():
@@ -319,8 +303,11 @@ def get_badwords_filter_fn(badwords, filter_fraction: float = 1.0):
 
 
 
-@app.command()
-def filter_pages(gz_file_path: str):
+def process(args):
+
+  gz_file_path = args.input
+  outfile_path = args.output or gz_file_path[:-len('gz')]+"cleaned.gz"
+
 
   langdetect = PredictLanguage(["ar"])
   langdetect.start_bundle()
@@ -329,30 +316,46 @@ def filter_pages(gz_file_path: str):
   badwords_filter = get_badwords_filter_fn(badwords, filter_fraction=0.999)
 
   with gzip.open(gz_file_path, "rt", encoding="utf-8") as f, \
-    gzip.open(gz_file_path[:-len('gz')]+"cleaned.gz", "wt", encoding="utf8") as o:
+    gzip.open(outfile_path, "wt", encoding="utf8") as o:
 
     for json_line in f:
       page = PageFeatures(**json.loads(json_line))
+      
+      if args.debug:
+        print(page.text)
 
-      page = clean_page(page)
-      if not page:
-        continue
+      if args.clean:
+        page = clean_page(page)
+        if args.debug:
+          print("after cleaning ....")
+          print(page and page.text)
+        if not page:
+          continue
 
       if not c4_utils.is_valid_length(page):
+        if args.debug:
+          print('skipped due to not valid length:', len(page.text))
         continue
 
       # url dedupe, choose newest page for same url (not applicable)
 
-      if not c4_utils.paragraph_filter(page):
+      if args.paragraph_filter and not c4_utils.paragraph_filter(page):
+        if args.debug:
+          print('skipped due to paragraph_filter')
         continue
         # clean (not applicable to Arabic)
 
       # language
-      page = langdetect.process(page)
-      if not page:
-        continue
+      if args.lang_detect:
+        page = langdetect.process(page)
+        if not page:
+          if args.debug:
+            print('skipped due to language')
+          continue
 
-      if not badwords_filter(page):
+      if args.badwords_filter and not badwords_filter(page):
+        if args.debug:
+          print('skipped due to bad words')
         continue
 
       o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
@@ -360,4 +363,24 @@ def filter_pages(gz_file_path: str):
 
 
 if __name__ == '__main__':
-  app()
+  import argparse
+
+  parser = argparse.ArgumentParser(
+    prog="c4-filter",
+    description="filter and clean using c4 strategy",
+  )
+  parser.add_argument('input', type=str, help='input file (.jsons.gz)')
+  parser.add_argument('-o', '--output', dest='output', help='output file')
+  parser.add_argument('--debug', dest='debug', action='store_true',
+                      help='debug')
+  parser.add_argument('--clean', dest='clean', action='store_true', default=False,
+                      help='run text cleaning for article')
+  parser.add_argument('--paragraph-filter', dest='paragraph_filter', action='store_true', default=False,
+                      help='run paragraph filter')
+  parser.add_argument('--lang-detect', dest='lang_detect', action='store_true', default=False,
+                      help='run language detection')
+  parser.add_argument('--badwords-filter', dest='badwords_filter', action='store_true', default=False,
+                      help='run badwords filter')
+
+  args = parser.parse_args()
+  process(args)
