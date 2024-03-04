@@ -14,7 +14,7 @@ import tensorflow as tf
 
 # Filters
 _MIN_WORDS_PER_LINE = 5
-_MIN_NUM_SENTENCES = 3
+_MIN_NUM_SENTENCES = 200
 _MAX_WORD_LENGTH = 1000
 _END_MARKS = (".", "?", "!", '"')    # FIXME add Arabic
 _ELLIPSIS = "..."
@@ -26,6 +26,9 @@ _POLICY_SUBSTRINGS = [
     "use of cookies",
     "use cookies",
 ]
+
+_MIN_PARAGRAPHS = 3
+_MIN_PARAGRAPH_LEN = 3
 
 
 _BADWORDS_URL = "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/5faf2ba42d7b1c0977169ec3611df25a3c08eb13/ar"
@@ -315,30 +318,36 @@ def process(args):
   badwords = load_badwords()
   badwords_filter = get_badwords_filter_fn(badwords, filter_fraction=0.999)
 
+  stats = collections.defaultdict(lambda: 0)
+
   with gzip.open(gz_file_path, "rt", encoding="utf-8") as f, \
     gzip.open(outfile_path, "wt", encoding="utf8") as o:
 
     for json_line in f:
       page = PageFeatures(**json.loads(json_line))
       
+      stats['total'] += 1
       if args.debug:
         print(page.text)
 
       if args.clean:
         page = clean_page(page)
         if not page:
+          stats['empty_after_clean'] += 1
           if args.debug:
             print("*********** skipped due to cleaning")
           continue
 
       if not c4_utils.is_valid_length(page):
         if args.debug:
+          stats['invalid_length'] += 1
           print('*********** skipped due to not valid length:', len(page.text))
         continue
 
       # url dedupe, choose newest page for same url (not applicable)
 
-      if args.paragraph_filter and not c4_utils.paragraph_filter(page):
+      if args.paragraph_filter and not c4_utils.paragraph_filter(page, min_paragraphs=args.min_paragraphs, min_paragraph_len=args.min_paragraph_len):
+        stats['paragraph_filter'] += 1
         if args.debug:
           print('********** skipped due to paragraph_filter')
         continue
@@ -352,13 +361,17 @@ def process(args):
           continue
 
       if args.badwords_filter and not badwords_filter(page):
+        stats['badwords_filter'] += 1
         if args.debug:
           print('********** skipped due to bad words')
         continue
 
+      stats['passed'] += 1
+
       o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
       o.write("\n")
 
+  print(json.dumps(stats, indent=4))
 
 if __name__ == '__main__':
   import argparse
@@ -375,6 +388,10 @@ if __name__ == '__main__':
                       help='run text cleaning for article')
   parser.add_argument('--paragraph-filter', dest='paragraph_filter', action='store_true', default=False,
                       help='run paragraph filter')
+  parser.add_argument('--min-paragraphs', dest='min_paragraphs', type=int, default=_MIN_PARAGRAPHS,
+                      help='minimal number of paragraphs')
+  parser.add_argument('--min-paragraph-len', dest='min_paragraph_len', type=int, default=_MIN_PARAGRAPH_LEN,
+                      help='minimal length for a paragraph')
   parser.add_argument('--lang-detect', dest='lang_detect', action='store_true', default=False,
                       help='run language detection')
   parser.add_argument('--badwords-filter', dest='badwords_filter', action='store_true', default=False,
