@@ -64,7 +64,7 @@ def counter_inc_fn(name):
 
 
 def get_counter_inc_fn(counter_name):
-  return print
+  return counter_inc_fn
 
 
 def is_javascript_code(text):
@@ -165,7 +165,6 @@ def clean_page(
 
   for line in lines:
     line = line.strip()
-    print(line)
     if not line_is_arabic(line):
       counter_inc_fn("line-filtered:not_arabic")
       continue
@@ -204,9 +203,10 @@ def clean_page(
     valid_lines.append(line)
     counter_inc_fn("line-passed")
 
-  if num_sentences < min_num_sentences:
-    counter_inc_fn("filtered:too_few_sentences")
-    return
+  # FIXME adapt it for Arabic
+  # if num_sentences < min_num_sentences:
+  #   counter_inc_fn("filtered:too_few_sentences")
+  #   return
   counter_inc_fn("passed")
   return dataclasses.replace(page, text=line_delimiter.join(valid_lines).strip())
 
@@ -326,36 +326,34 @@ def process(args):
 
       if args.clean:
         page = clean_page(page)
-        if args.debug:
-          print("after cleaning ....")
-          print(page and page.text)
         if not page:
+          if args.debug:
+            print("*********** skipped due to cleaning")
           continue
 
       if not c4_utils.is_valid_length(page):
         if args.debug:
-          print('skipped due to not valid length:', len(page.text))
+          print('*********** skipped due to not valid length:', len(page.text))
         continue
 
       # url dedupe, choose newest page for same url (not applicable)
 
       if args.paragraph_filter and not c4_utils.paragraph_filter(page):
         if args.debug:
-          print('skipped due to paragraph_filter')
+          print('********** skipped due to paragraph_filter')
         continue
-        # clean (not applicable to Arabic)
 
       # language
       if args.lang_detect:
         page = langdetect.process(page)
         if not page:
           if args.debug:
-            print('skipped due to language')
+            print('******** skipped due to language')
           continue
 
       if args.badwords_filter and not badwords_filter(page):
         if args.debug:
-          print('skipped due to bad words')
+          print('********** skipped due to bad words')
         continue
 
       o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
