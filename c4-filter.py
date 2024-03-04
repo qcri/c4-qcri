@@ -16,7 +16,7 @@ import tensorflow as tf
 _MIN_WORDS_PER_LINE = 5
 _MIN_NUM_SENTENCES = 3
 _MAX_WORD_LENGTH = 1000
-_END_MARKS = (".", "?", "!", '"')    # FIXME add Arabic
+_END_MARKS = (".", "?", "!", '"', "؟")    # FIXME add Arabic
 _ELLIPSIS = "..."
 _POLICY_SUBSTRINGS = [
     "terms of use",
