@@ -327,21 +327,19 @@ def process(args):
       page = PageFeatures(**json.loads(json_line))
 
       stats['total'] += 1
-      if args.debug:
-        print('[ URL: ', page.url, ']')
 
       if args.clean:
         page = clean_page(page)
         if not page:
           stats['empty_after_clean'] += 1
           if args.debug:
-            print("*********** skipped due to cleaning")
+            print("*** [", page.url, "] SKIPPED no text after cleaning")
           continue
 
       if not c4_utils.is_valid_length(page):
         if args.debug:
           stats['invalid_length'] += 1
-          print('*********** skipped due to not valid length:', len(page.text))
+          print("*** [", page.url, "] SKIPPED text is too long")
         continue
 
       # url dedupe, choose newest page for same url (not applicable)
@@ -349,7 +347,7 @@ def process(args):
       if args.paragraph_filter and not c4_utils.paragraph_filter(page, min_paragraphs=args.min_paragraphs, min_paragraph_len=args.min_paragraph_len):
         stats['paragraph_filter'] += 1
         if args.debug:
-          print('********** skipped due to paragraph_filter')
+          print("*** [", page.url, "] SKIPPED paragraphs <", args.min_paragraphs, " or paragraph length < ", args.min_paragraph_len)
         continue
 
       # language
@@ -357,13 +355,13 @@ def process(args):
         page = langdetect.process(page)
         if not page:
           if args.debug:
-            print('******** skipped due to language')
+            print("*** [", page.url, "] SKIPPED text is not Arabic")
           continue
 
       if args.badwords_filter and not badwords_filter(page):
         stats['badwords_filter'] += 1
         if args.debug:
-          print('********** skipped due to bad words')
+          print("*** [", page.url, "] SKIPPED text contains bad words")
         continue
 
       stats['passed'] += 1
