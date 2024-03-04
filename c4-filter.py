@@ -325,10 +325,10 @@ def process(args):
 
     for json_line in f:
       page = PageFeatures(**json.loads(json_line))
-      
+
       stats['total'] += 1
       if args.debug:
-        print(page.text)
+        print('[ URL: ', page.url, ']')
 
       if args.clean:
         page = clean_page(page)
