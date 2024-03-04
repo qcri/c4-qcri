@@ -346,7 +346,7 @@ def process(args):
             print("*** [", url, "] SKIPPED no text after cleaning")
           continue
 
-      if not c4_utils.is_valid_length(page):
+      if args.length_filter and not c4_utils.is_valid_length(page):
         if args.debug:
           stats['invalid_length'] += 1
           print("*** [", page.url, "] SKIPPED text is too long")
@@ -401,6 +401,8 @@ if __name__ == '__main__':
                       help='use this flag to display decisions made in cleaning')
   parser.add_argument('--clean', dest='clean', action='store_true', default=False,
                       help='run text cleaning for article')
+  parser.add_argument('--length-filter', dest='length_filter', action='store_true', default=False,
+                      help='filter content too short or too long')
   parser.add_argument('--paragraph-filter', dest='paragraph_filter', action='store_true', default=False,
                       help='run paragraph filter')
   parser.add_argument('--min-paragraphs', dest='min_paragraphs', type=int, default=_MIN_PARAGRAPHS,
