@@ -14,7 +14,7 @@ import tensorflow as tf
 
 # Filters
 _MIN_WORDS_PER_LINE = 5
-_MIN_NUM_SENTENCES = 200
+_MIN_NUM_SENTENCES = 3
 _MAX_WORD_LENGTH = 1000
 _END_MARKS = (".", "?", "!", '"')    # FIXME add Arabic
 _ELLIPSIS = "..."
@@ -28,7 +28,7 @@ _POLICY_SUBSTRINGS = [
 ]
 
 _MIN_PARAGRAPHS = 3
-_MIN_PARAGRAPH_LEN = 3
+_MIN_PARAGRAPH_LEN = 200
 
 
 _BADWORDS_URL = "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/5faf2ba42d7b1c0977169ec3611df25a3c08eb13/ar"
@@ -122,6 +122,7 @@ def clean_page(
     min_num_sentences=_MIN_NUM_SENTENCES,
     max_word_length=_MAX_WORD_LENGTH,
     line_delimiter="\n",
+    debug=False
 ) -> Iterable[PageFeatures]:
   """Cleans a CommonCrawl page, yielding nothing if it should be skipped.
 
@@ -150,6 +151,9 @@ def clean_page(
   if not counter_inc_fn:
     counter_inc_fn = get_counter_inc_fn("clean-page")
 
+  if debug:
+    counter_inc_fn = print
+
   lines = text.splitlines()
   valid_lines = []
   num_sentences = 0
@@ -168,6 +172,8 @@ def clean_page(
 
   for line in lines:
     line = line.strip()
+    if debug:
+      print(">>>", line)
     if not line_is_arabic(line):
       counter_inc_fn("line-filtered:not_arabic")
       continue
@@ -326,14 +332,18 @@ def process(args):
     for json_line in f:
       page = PageFeatures(**json.loads(json_line))
 
+      if args.debug_url and page.url != args.debug_url:
+        continue
+
       stats['total'] += 1
 
       if args.clean:
-        page = clean_page(page)
+        url = page.url
+        page = clean_page(page, debug=args.debug_clean)
         if not page:
           stats['empty_after_clean'] += 1
           if args.debug:
-            print("*** [", page.url, "] SKIPPED no text after cleaning")
+            print("*** [", url, "] SKIPPED no text after cleaning")
           continue
 
       if not c4_utils.is_valid_length(page):
@@ -350,13 +360,13 @@ def process(args):
           print("*** [", page.url, "] SKIPPED paragraphs <", args.min_paragraphs, " or paragraph length < ", args.min_paragraph_len)
         continue
 
-      # language
-      if args.lang_detect:
-        page = langdetect.process(page)
-        if not page:
-          if args.debug:
-            print("*** [", page.url, "] SKIPPED text is not Arabic")
-          continue
+      # # language
+      # if args.lang_detect:
+      #   page = langdetect.process(page)
+      #   if not page:
+      #     if args.debug:
+      #       print("*** [", page.url, "] SKIPPED text is not Arabic")
+      #     continue
 
       if args.badwords_filter and not badwords_filter(page):
         stats['badwords_filter'] += 1
@@ -368,6 +378,9 @@ def process(args):
 
       o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
       o.write("\n")
+
+      if args.debug_url and page.url == args.debug_url:
+        break
 
   print(json.dumps(stats, indent=4))
 
@@ -382,6 +395,10 @@ if __name__ == '__main__':
   parser.add_argument('-o', '--output', dest='output', help='output file')
   parser.add_argument('--debug', dest='debug', action='store_true',
                       help='debug')
+  parser.add_argument('--debug-url', dest='debug_url', type=str,
+                      help='use if you want to debug a specific url')
+  parser.add_argument('--debug-clean', dest='debug_clean', action='store_true', default=False,
+                      help='use this flag to display decisions made in cleaning')
   parser.add_argument('--clean', dest='clean', action='store_true', default=False,
                       help='run text cleaning for article')
   parser.add_argument('--paragraph-filter', dest='paragraph_filter', action='store_true', default=False,
