@@ -415,7 +415,7 @@ if __name__ == '__main__':
   parser.add_argument('--debug-clean', dest='debug_clean', action='store_true', default=False,
                       help='use this flag to display decisions made in cleaning')
   parser.add_argument('-o', '--output', dest='output', help='output file')
-  parser.add_argument('--outdir', dest='outdir', type=str,
+  parser.add_argument('--out-dir', dest='out_dir', type=str,
                       help='output directory')
   parser.add_argument('--clean', dest='clean', action='store_true', default=False,
                       help='run text cleaning for article')
