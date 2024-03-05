@@ -50,6 +50,7 @@ class PageFeatures:
   timestamp: str = ""
   content_length: str = ""
   content_type: str = ""
+  word_count: Optional[int] = None
   language: Optional[str] = None
 
 
@@ -319,11 +320,18 @@ def get_badwords_filter_fn(badwords, filter_fraction: float = 1.0):
 def process(args):
 
   gz_file_path = args.input
-  outfile_path = args.output or gz_file_path[:-len('gz')]+"cleaned.gz"
+
+  if args.out_dir:
+    outdir = os.path.join(args.out_dir, os.path.dirname(gz_file_path))
+    basename = os.path.basename(gz_file_path)
+    outfile_path = os.path.join(outdir, basename)
+    os.makedirs(outdir, exist_ok=True)
+  else:
+    outfile_path = args.output or gz_file_path[:-len('gz')]+"cleaned.gz"
 
 
-  langdetect = PredictLanguage(["ar"])
-  langdetect.start_bundle()
+  # langdetect = PredictLanguage(["ar"])
+  # langdetect.start_bundle()
 
   badwords = load_badwords()
   badwords_filter = get_badwords_filter_fn(badwords, filter_fraction=0.999)
@@ -380,6 +388,10 @@ def process(args):
 
       stats['passed'] += 1
 
+      if args.add_word_count:
+        page.word_count = len(page.text.split())
+        stats['total_word_count'] += page.word_count
+
       o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
       o.write("\n")
 
@@ -396,13 +408,15 @@ if __name__ == '__main__':
     description="filter and clean using c4 strategy",
   )
   parser.add_argument('input', type=str, help='input file (.jsons.gz)')
-  parser.add_argument('-o', '--output', dest='output', help='output file')
   parser.add_argument('--debug', dest='debug', action='store_true',
                       help='debug')
   parser.add_argument('--debug-url', dest='debug_url', type=str,
                       help='use if you want to debug a specific url')
   parser.add_argument('--debug-clean', dest='debug_clean', action='store_true', default=False,
                       help='use this flag to display decisions made in cleaning')
+  parser.add_argument('-o', '--output', dest='output', help='output file')
+  parser.add_argument('--outdir', dest='outdir', type=str,
+                      help='output directory')
   parser.add_argument('--clean', dest='clean', action='store_true', default=False,
                       help='run text cleaning for article')
   parser.add_argument('--length-filter', dest='length_filter', action='store_true', default=False,
@@ -417,6 +431,8 @@ if __name__ == '__main__':
                       help='run language detection')
   parser.add_argument('--badwords-filter', dest='badwords_filter', action='store_true', default=False,
                       help='run badwords filter')
+  parser.add_argument('--add-word-count', dest='add_word_count', action='store_true', default=False,
+                      help='add word counts in output')
 
   args = parser.parse_args()
   process(args)
