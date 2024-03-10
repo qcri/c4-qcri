@@ -1,8 +1,17 @@
 #!bash -ex
 
+# c4-qcri.sh
+# QCRI's script to download and clean Arabic data from CommonCrawl. It does
+# - download a given CommonCrawl dump (WET files)
+# - parse and extract only pages with 'ara' in identified languages
+# - output is gzipped jsonl format
+#
+# by Yifan Zhang (yzhang@hbku.edu.qa)
+# Copyright (C) 2024, Qatar Computing Research Institute
+
 
 # to clean up and terminate child processes
-cleanup() {
+function cleanup {
     echo "Interrupt signal received. Cleaning up..."
     # Terminate all child processes
     pkill -P $$
@@ -11,6 +20,48 @@ cleanup() {
 
 # Trap SIGINT signal (Ctrl+C) and call cleanup function
 trap cleanup SIGINT
+
+
+function wget_until_success {
+    URL=$1
+    SAVETO=$2
+    while true; do
+        wget -T 15 -q -O "$SAVETO" "$URL" && break
+    done
+}
+
+function download_and_parse {
+    WETPATH=$1
+
+    # download wet file
+    BASENAME=$(basename $WETPATH)
+    SUBDIR=${BASENAME%-*}
+    DOWNLOADED="$SUBDIR/$BASENAME"
+    GZOUTPUT="${DOWNLOADED%gz}ara.jsonl.gz"
+    
+    # if we have downloaded wet file, we probably didn't finish
+    # previous job, it is better to remove both output file and
+    # redo this particular file
+    if [ -s "$DOWNLOADED" ]; then
+        rm -f "$GZOUTPUT"
+        rm -f "$DOWNLOADED"
+    fi
+
+    # if output file exist, skip; if not, download and process it
+    if [ ! -s "$GZOUTPUT" ]; then
+        if [ ! -s "$DOWNLOADED" ]; then
+            wget_until_success "https://data.commoncrawl.org/$WETPATH" "$DOWNLOADED"
+        fi
+
+        python3 split_wet_file.py "$DOWNLOADED"
+    fi
+
+    # remove downloaded wet file to save space, only keep output
+    if [ -s "$GZOUTPUT" ]; then
+        rm -f "$DOWNLOADED"
+    fi
+
+}
 
 
 CC_VERSIONS=(
@@ -40,7 +91,7 @@ do
 done
 
 
-mkdir -p download_and_split
+mkdir -p run
 
 if [ ! -s "download_and_split/input.txt" ]; then
     for CC_VERSION in "${CC_VERSIONS[@]}";
@@ -50,26 +101,10 @@ if [ ! -s "download_and_split/input.txt" ]; then
         else
             zcat wet.paths/${CC_VERSION}.wet.paths.gz
         fi
-    done >> download_and_split/input.txt
+    done >> run/input.txt
 fi
 
 
-NUM_TASKS=64
-NUM_LINES=$(wc -l < download_and_split/input.txt)
-LINES_PER_TASK=$((NUM_LINES / NUM_TASKS))
-EXTRA_LINES=$((NUM_LINES % NUM_TASKS))
-INPUT_FILE="download_and_split/input.txt"
-
-for ((i = 0; i < NUM_TASKS; i++)); do
-    START_LINE=$((i*LINES_PER_TASK + 1))
-    END_LINE=$((START_LINE + LINES_PER_TASK - 1))
-    if [ $i -eq $((NUM_TASKS - 1)) ]; then
-        END_LINE=$((END_LINE + EXTRA_LINES))
-    fi
-
-    ./download_and_split.sh $START_LINE $END_LINE $i &> $i.log &
-done
-
-wait
+parallel --joblog download_and_parse.log -j $(nproc) -a run/input.txt download_and_parse
 
 date '+%Y-%m-%d %H:%M:%S'
