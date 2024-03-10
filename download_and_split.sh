@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -x
 #SBATCH --job-name=download_and_split_$3
 #SBATCH --output=download_and_split/output_task_$3.log
 
@@ -17,7 +17,9 @@ do
 
   if [ ! -s "$OUTPUT" ]; then
     if [ ! -s "$DOWNLOADED" ]; then
-      wget -q -O "$DOWNLOADED" "https://data.commoncrawl.org"/${LINE}
+      while true; do
+        wget -T 15 -q -O "$DOWNLOADED" "https://data.commoncrawl.org"/${LINE} && break
+      done
     fi
     python3 split_wet_file.py "$DOWNLOADED"
   fi
