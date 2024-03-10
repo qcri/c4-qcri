@@ -1,7 +1,21 @@
 #!bash -ex
 
+
+# to clean up and terminate child processes
+cleanup() {
+    echo "Interrupt signal received. Cleaning up..."
+    # Terminate all child processes
+    pkill -P $$
+    exit 1
+}
+
+# Trap SIGINT signal (Ctrl+C) and call cleanup function
+trap cleanup SIGINT
+
+
 CC_VERSIONS=(
- "2022-33"
+  $(basename $(pwd))
+# "2022-33"
 #  "2022-40"
 #  "2022-49"
 #  "2023-06"
