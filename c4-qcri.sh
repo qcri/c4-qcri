@@ -38,6 +38,8 @@ function download_and_parse {
     SUBDIR=${BASENAME%-*}
     DOWNLOADED="$SUBDIR/$BASENAME"
     GZOUTPUT="${DOWNLOADED%gz}ara.jsonl.gz"
+
+    mkdir -p $SUBDIR
     
     # if we have downloaded wet file, we probably didn't finish
     # previous job, it is better to remove both output file and
