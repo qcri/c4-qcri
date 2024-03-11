@@ -30,6 +30,10 @@ function wget_until_success {
     done
 }
 
+
+export -f wget_until_success
+
+
 function download_and_parse {
     WETPATH=$1
 
