@@ -1,9 +1,11 @@
 import re
+import os
 import sys
 import gzip
 import json
 import logging
 import dataclasses
+from functools import cache
 from typing import Optional
 
 
@@ -84,15 +86,23 @@ def split_pages(wet_file_path):
     if _validate_features(page):
       yield page
 
-with gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt", encoding="utf8") as o:
-  total = 0
-  count = 0
 
-  for page in split_pages(wet_file_path):
-    total += 1
-    if page.language and 'ara' in page.language.split(','):
-      count += 1
-      o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
-      o.write("\n")
+if not os.path.exists(wet_file_path):
+  print(f"input file not found: {wet_file_path}", file=sys.stderr) 
+  sys.exit(1)
 
-  logging.info("%d/%d extracted", count, total)
+
+@cache
+def lazy_gzip_open():
+  return gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt", encoding="utf8")
+
+total = 0
+count = 0
+
+for page in split_pages(wet_file_path):
+  total += 1
+  if page.language and 'ara' in page.language.split(','):
+    count += 1
+    lazy_gzip_open().write(json.dumps(dataclasses.asdict(page), ensure_ascii=False) + "\n")
+
+logging.info("%d/%d extracted", count, total)

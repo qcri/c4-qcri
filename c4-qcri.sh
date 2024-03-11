@@ -59,7 +59,12 @@ function download_and_parse {
             wget_until_success "https://data.commoncrawl.org/$WETPATH" "$DOWNLOADED"
         fi
 
-        python3 split_wet_file.py "$DOWNLOADED"
+        if [ ! -s "$GZOUTPUT"]; then
+            echo "Downloading failed"
+            return 1
+        else 
+            python3 split_wet_file.py "$DOWNLOADED"
+        fi
     fi
 
     # remove downloaded wet file to save space, only keep output
