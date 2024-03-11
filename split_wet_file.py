@@ -5,7 +5,7 @@ import gzip
 import json
 import logging
 import dataclasses
-from functools import cache
+from functools import lru_cache
 from typing import Optional
 
 
@@ -92,7 +92,7 @@ if not os.path.exists(wet_file_path):
   sys.exit(1)
 
 
-@cache
+@lru_cache
 def lazy_gzip_open():
   return gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt", encoding="utf8")
 
