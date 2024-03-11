@@ -59,7 +59,7 @@ function download_and_parse {
             wget_until_success "https://data.commoncrawl.org/$WETPATH" "$DOWNLOADED"
         fi
 
-        if [ ! -s "$GZOUTPUT"]; then
+        if [ ! -s "$GZOUTPUT" ]; then
             echo "Downloading failed"
             return 1
         else 
@@ -118,6 +118,6 @@ if [ ! -s "download_and_split/input.txt" ]; then
 fi
 
 
-parallel --joblog download_and_parse.log -j $(nproc) -a run/input.txt download_and_parse
+parallel --joblog run/download_and_parse.log -j $(nproc) -a run/input.txt download_and_parse
 
 date '+%Y-%m-%d %H:%M:%S'
