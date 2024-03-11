@@ -59,7 +59,7 @@ function download_and_parse {
             wget_until_success "https://data.commoncrawl.org/$WETPATH" "$DOWNLOADED"
         fi
 
-        if [ ! -s "$GZOUTPUT" ]; then
+        if [ ! -s "$DOWNLOADED" ]; then
             echo "Downloading failed"
             return 1
         else 
