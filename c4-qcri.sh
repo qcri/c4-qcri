@@ -63,6 +63,8 @@ function download_and_parse {
 
 }
 
+export -f download_and_parse
+
 
 CC_VERSIONS=(
   $(basename $(pwd))
