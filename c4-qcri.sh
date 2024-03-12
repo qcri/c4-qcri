@@ -27,6 +27,7 @@ function wget_until_success {
     SAVETO=$2
     while true; do
         wget -T 120 -q -O "$SAVETO" "$URL" && break
+        sleep 60
     done
 }
 
