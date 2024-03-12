@@ -1,12 +1,13 @@
 import os
 import re
 import sys
-import gzip
 import json
 import logging
+import fileinput
 import dataclasses
 import hashlib
 import collections
+import functools
 from typing import Optional, Iterable, Mapping, Sequence
 import tensorflow_datasets as tfds
 from tensorflow_datasets.text import c4_utils
@@ -127,6 +128,7 @@ def clean_page(
     min_num_sentences=_MIN_NUM_SENTENCES,
     max_word_length=_MAX_WORD_LENGTH,
     line_delimiter="\n",
+    only_arabic=False,
     debug=False
 ) -> Iterable[PageFeatures]:
   """Cleans a CommonCrawl page, yielding nothing if it should be skipped.
@@ -147,6 +149,7 @@ def clean_page(
     max_word_length: int, the maximum number of characters allowed in a word.
       Lines containing a word with too many characters are removed.
     line_delimiter: str, the delimiter used to separate and join lines.
+    only_arabic: bool, keep only lines includes Arabic characters (not necessarily exclusively Arabic)
 
   Yields:
     The url and cleaned text for the page.
@@ -157,7 +160,9 @@ def clean_page(
     counter_inc_fn = get_counter_inc_fn("clean-page")
 
   if debug:
-    counter_inc_fn = print
+    def stderr_print(*args, **kwargs):
+      print(*args, **kwargs, file=sys.stderr)
+    counter_inc_fn = stderr_print
 
   lines = text.splitlines()
   valid_lines = []
@@ -169,6 +174,9 @@ def clean_page(
   def line_is_code(line):
     return is_javascript_code(line)
 
+  def line_is_copyright(line):
+    return '©' in line
+
   def line_has_too_long_word(line):
     for word in line.split():
       if len(word) > max_word_length:
@@ -178,8 +186,8 @@ def clean_page(
   for line in lines:
     line = line.strip()
     if debug:
-      print(">>>", line)
-    if not line_is_arabic(line):
+      print(">>>", line, file=sys.stderr)
+    if only_arabic and not line_is_arabic(line):
       counter_inc_fn("line-filtered:not_arabic")
       continue
     if line_has_too_long_word(line):
@@ -207,55 +215,24 @@ def clean_page(
     # Remove docs which probably contain javascript code
     if "{" in line:
       counter_inc_fn("filtered:squigglybracket")
-      return
+      continue
+    # Remove copyrights
+    if "©" in line:
+      counter_inc_fn("filtered:copyright")
+      continue
     # Remove policy lines
     if any(p in line_lower for p in _POLICY_SUBSTRINGS):
       counter_inc_fn("line-filtered:policy")
       continue
-    # FIXME adapt it for Arabic
     # num_sentences += len(_get_sentences(line))
     valid_lines.append(line)
     counter_inc_fn("line-passed")
 
-  # FIXME adapt it for Arabic
   # if num_sentences < min_num_sentences:
   #   counter_inc_fn("filtered:too_few_sentences")
   #   return
   counter_inc_fn("passed")
   return dataclasses.replace(page, text=line_delimiter.join(valid_lines).strip())
-
-
-class PredictLanguage():
-  """Predicts page's language using cld3 and adds to features."""
-
-  def __init__(self, valid_languages, min_probability=0.95):
-    self._valid_languages = set(valid_languages)
-    self._counter_inc_fn = get_counter_inc_fn("language-filter")
-    self._min_probability = min_probability
-
-  def start_bundle(self):
-    self._detector = tfds.core.lazy_imports.gcld3.NNetLanguageIdentifier(
-        # CLD3 is not expected to work well on very short documents.
-        min_num_bytes=100,
-        max_num_bytes=10000,
-    )
-
-  def process(self, page: PageFeatures):
-    result = self._detector.FindLanguage(page.text)
-    if not result.is_reliable:
-      self._counter_inc_fn("filtered:no_predictions")
-      lang = UNKNOWN_LANGUAGE
-    elif result.probability < self._min_probability:
-      self._counter_inc_fn("filtered:low_confidence")
-      lang = UNKNOWN_LANGUAGE
-    else:
-      lang = result.language
-      if lang not in self._valid_languages:
-        self._counter_inc_fn("filtered:ignored_language")
-        return
-    self._counter_inc_fn("passed")
-    self._counter_inc_fn("passed:%s" % lang)
-    return dataclasses.replace(page, language=lang)
 
 
 def get_hashed_url_filter_fn(predicate_fn):
@@ -319,86 +296,78 @@ def get_badwords_filter_fn(badwords, filter_fraction: float = 1.0):
 
 def process(args):
 
-  gz_file_path = args.input
-
-  if args.out_dir:
-    outdir = os.path.join(args.out_dir, os.path.dirname(gz_file_path))
-    basename = os.path.basename(gz_file_path)
-    outfile_path = os.path.join(outdir, basename)
-    os.makedirs(outdir, exist_ok=True)
-  else:
-    outfile_path = args.output or gz_file_path[:-len('gz')]+"cleaned.gz"
-
-
-  # langdetect = PredictLanguage(["ar"])
-  # langdetect.start_bundle()
-
   badwords = load_badwords()
   badwords_filter = get_badwords_filter_fn(badwords, filter_fraction=0.999)
 
   stats = collections.defaultdict(lambda: 0)
 
-  with gzip.open(gz_file_path, "rt", encoding="utf-8") as f, \
-    gzip.open(outfile_path, "wt", encoding="utf8") as o:
+  for json_line in fileinput.input(files=("-"), encoding="utf-8"):
+    page = PageFeatures(**json.loads(json_line))
 
-    for json_line in f:
-      page = PageFeatures(**json.loads(json_line))
+    if args.debug_url and page.url != args.debug_url:
+      continue
 
-      if args.debug_url and page.url != args.debug_url:
-        continue
+    stats['total'] += 1
 
-      stats['total'] += 1
+    url = page.url
 
-      if args.clean:
-        url = page.url
-        page = clean_page(page, debug=args.debug_clean)
-        if not page:
-          stats['empty_after_clean'] += 1
-          if args.debug:
-            print("*** [", url, "] SKIPPED no text after cleaning")
-          continue
+    if 'porn' in page.url:
+      print("*** [", url, "] SKIPPED porn in url", file=sys.stderr)
+      continue
 
-      if args.length_filter and not c4_utils.is_valid_length(page):
+    if 'video' in page.url:
+      print("*** [", url, "] SKIPPED video in url", file=sys.stderr)
+      continue
+
+    if args.clean:
+      page = clean_page(page, only_arabic=args.only_arabic, debug=args.debug_clean)
+      if not page:
+        stats['empty_after_clean'] += 1
         if args.debug:
-          stats['invalid_length'] += 1
-          print("*** [", page.url, "] SKIPPED text is too long")
+          print("*** [", url, "] SKIPPED no text after cleaning", file=sys.stderr)
         continue
 
-      # url dedupe, choose newest page for same url (not applicable)
+    if args.length_filter and not c4_utils.is_valid_length(page):
+      if args.debug:
+        stats['invalid_length'] += 1
+        print("*** [", page.url, "] SKIPPED text is too long", file=sys.stderr)
+      continue
 
-      if args.paragraph_filter and not c4_utils.paragraph_filter(page, min_paragraphs=args.min_paragraphs, min_paragraph_len=args.min_paragraph_len):
-        stats['paragraph_filter'] += 1
-        if args.debug:
-          print("*** [", page.url, "] SKIPPED paragraphs <", args.min_paragraphs, " or paragraph length < ", args.min_paragraph_len)
-        continue
+    # url dedupe, choose newest page for same url (not applicable)
 
-      # # language
-      # if args.lang_detect:
-      #   page = langdetect.process(page)
-      #   if not page:
-      #     if args.debug:
-      #       print("*** [", page.url, "] SKIPPED text is not Arabic")
-      #     continue
+    if args.paragraph_filter and not c4_utils.paragraph_filter(page, min_paragraphs=args.min_paragraphs, min_paragraph_len=args.min_paragraph_len):
+      stats['paragraph_filter'] += 1
+      if args.debug:
+        print("*** [", page.url, "] SKIPPED paragraphs <", args.min_paragraphs, " or paragraph length < ", args.min_paragraph_len, file=sys.stderr)
+      continue
 
-      if args.badwords_filter and not badwords_filter(page):
-        stats['badwords_filter'] += 1
-        if args.debug:
-          print("*** [", page.url, "] SKIPPED text contains bad words")
-        continue
+    # # language
+    # if args.lang_detect:
+    #   page = langdetect.process(page)
+    #   if not page:
+    #     if args.debug:
+    #       print("*** [", page.url, "] SKIPPED text is not Arabic")
+    #     continue
 
-      stats['passed'] += 1
+    if args.badwords_filter and not badwords_filter(page):
+      stats['badwords_filter'] += 1
+      if args.debug:
+        print("*** [", page.url, "] SKIPPED text contains bad words", file=sys.stderr)
+      continue
 
-      if args.add_word_count:
-        page.word_count = len(page.text.split())
-        stats['total_word_count'] += page.word_count
+    stats['passed'] += 1
 
-      o.write(json.dumps(dataclasses.asdict(page), ensure_ascii=False))
-      o.write("\n")
+    if args.add_word_count:
+      page.word_count = len(page.text.split())
+      stats['total_word_count'] += page.word_count
 
       if args.debug_url and page.url == args.debug_url:
         break
 
-  print(json.dumps(stats, indent=4))
+    if page.text:
+      print(json.dumps(dataclasses.asdict(page), ensure_ascii=False), file=sys.stdout)
+
+  print(json.dumps(stats, indent=4), file=sys.stderr)
 
 if __name__ == '__main__':
   import argparse
@@ -407,7 +376,6 @@ if __name__ == '__main__':
     prog="c4-filter",
     description="filter and clean using c4 strategy",
   )
-  parser.add_argument('input', type=str, help='input file (.jsons.gz)')
   parser.add_argument('--debug', dest='debug', action='store_true',
                       help='debug')
   parser.add_argument('--debug-url', dest='debug_url', type=str,
@@ -419,6 +387,8 @@ if __name__ == '__main__':
                       help='output directory')
   parser.add_argument('--clean', dest='clean', action='store_true', default=False,
                       help='run text cleaning for article')
+  parser.add_argument('--only-arabic', dest='only_arabic', action='store_true', default=False,
+                      help='keep text only if it contains at least some Arabic characters')
   parser.add_argument('--length-filter', dest='length_filter', action='store_true', default=False,
                       help='filter content too short or too long')
   parser.add_argument('--paragraph-filter', dest='paragraph_filter', action='store_true', default=False,
