@@ -7,11 +7,7 @@ import fileinput
 import dataclasses
 import hashlib
 import collections
-import functools
-from typing import Optional, Iterable, Mapping, Sequence
-import tensorflow_datasets as tfds
-from tensorflow_datasets.text import c4_utils
-import tensorflow as tf
+from typing import Optional, Any
 
 
 _SCRIPT_DIR=os.path.dirname(os.path.realpath(__file__))
@@ -53,14 +49,203 @@ class PageFeatures:
   content_type: str = ""
   word_count: Optional[int] = None
   language: Optional[str] = None
+  discarded: Optional[str] = None
 
 
-def normalize_url(url):
-  # url = tf.compat.as_text(url)
-  url = re.sub(r"https?:\/\/(www\.)?", "", url)
-  url = re.sub(r"\?(utm_|ref|feed).*", "", url)
-  url = url.rstrip("/")
-  return url
+class Filter:
+  def __init__(self):
+    pass
+
+  def should_pass(self, page):
+    return True
+
+  def __call__(self, page):
+    if self.should_pass(page):
+      return page
+
+
+class Processor:
+  def __init__(self):
+    pass
+
+  def process(self, page):
+    pass
+
+  def __call__(self, page):
+    self.process(page)
+    return page
+
+
+class Pipeline:
+  def __init__(self, modules, debug=False):
+    self.modules = modules
+    self.debug = debug
+
+  def __call__(self, dataset):
+    print("Pipeline.__call__")
+    for page in dataset:
+      for module in self.modules:
+        if self.debug:
+          print(f"{module} {page}")
+        new_page = module(page)
+        if new_page is None:
+          if self.debug:
+            page.discarded = module.__class__.__name__
+            yield page
+          break
+        page = new_page
+      else:
+        yield page
+
+
+class NormalizeUrlProcessor(Processor):
+  def __init__(self):
+    super().__init__()
+
+  def process(self, page):
+    url = page.url
+    url = re.sub(r"https?:\/\/(www\.)?", "", url)
+    url = re.sub(r"\?(utm_|ref|feed).*", "", url)
+    url = url.rstrip("/")
+    page.url = url
+
+
+class WordCountProcessor(Processor):
+  def __init__(self):
+    super().__init__()
+
+  def process(self, page):
+    page.word_count = len(page.text.split())
+
+
+class CleanTextProcessor(Processor):
+  def __init__(self):
+    super().__init__()
+
+  @staticmethod
+  def line_is_copyright(text):
+    return '©' in text
+    
+  @staticmethod
+  def line_is_javascript_code(text):
+      # Count occurrences of specific characters
+      count_open_parenthesis = text.count('(')
+      count_close_parenthesis = text.count(')')
+      count_dollar_sign = text.count('$')
+      count_semicolon = text.count(';')
+      count_equals = text.count('=')
+      count_equals = text.count('{')
+      count_equals = text.count('}')
+      count_equals = text.count('+')
+      count_equals = text.count('_')
+      count_equals = text.count("'")
+      count_equals = text.count('"')
+      count_equals = text.count('#')
+      count_equals = text.count('/')
+      
+      # Calculate the total number of characters
+      total_characters = len(text)
+      
+      # Calculate the total count of specific characters
+      total_count = (count_open_parenthesis + count_close_parenthesis +
+                    count_dollar_sign + count_semicolon + count_equals)
+      
+      # Calculate the percentage of the total count relative to the total characters
+      percentage_total_count = (total_count / total_characters) * 100
+      
+      # Check if the percentage exceeds 8%
+      if percentage_total_count > 8:
+          return True
+      else:
+          return False
+
+  @staticmethod
+  def contains_arabic(text):
+    # Regular expression pattern to match Arabic characters
+    arabic_pattern = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+')
+    
+    # Check if the pattern matches the text
+    if arabic_pattern.search(text):
+        return True
+    else:
+        return False
+
+  def process(self, page):
+    text = page.text
+    lines = text.splitlines()
+
+    valid_lines = []
+
+    for line in lines:
+      line = line.strip()
+
+      if CleanTextProcessor.line_is_javascript_code(line):
+        continue
+
+      if not CleanTextProcessor.contains_arabic(line):
+        continue
+
+      line_lower = line.lower()
+      # Remove documents which contain lorem ipsum
+      if "lorem ipsum" in line_lower:
+        counter_inc_fn("filtered:loremipsum")
+        return
+      # Remove "javascript must be enabled" notices
+      if "javascript" in line_lower:
+        counter_inc_fn("line-filtered:javascript")
+        continue
+      # Remove docs which probably contain javascript code
+      if "{" in line:
+        counter_inc_fn("filtered:squigglybracket")
+        continue
+      # Remove copyrights
+      if "©" in line:
+        counter_inc_fn("filtered:copyright")
+        continue
+      # Remove policy lines
+      if any(p in line_lower for p in _POLICY_SUBSTRINGS):
+        counter_inc_fn("line-filtered:policy")
+        continue
+
+      # num_sentences += len(_get_sentences(line))
+      valid_lines.append(line)
+
+    page.text = '\n'.join(valid_lines)
+    
+
+class BadUrlFilter(Filter):
+  def __init__(self, **kwargs):
+    super().__init__(**kwargs)
+    self.regex = re.compile(r"(porn|video)")
+
+  def should_pass(self, page):
+    if self.regex.search(page.url.lower()):
+      return True
+    return False
+
+
+class LengthFilter(Filter):
+  def __init__(self, min_len=100, max_len=10000, **kwargs):
+    super().__init__(**kwargs)
+    self.min_len = min_len
+    self.max_len = max_len
+
+  def should_pass(self, page):
+    if self.min_len < len(page.text) < self.max_len:
+      return True
+    return False
+
+
+class BadWordsFilter(Filter):
+  def __init__(self, badwords, filter_fraction=0.01, **kwargs):
+    super().__init__(**kwargs)
+    self.badwords = badwords
+    self.filter_fraction = filter_fraction
+    self.filter = get_badwords_filter_fn(badwords=badwords, filter_fraction=filter_fraction)
+
+  def should_pass(self, page):
+    return self.filter(page)
+
 
 
 line_delimiter = '\n'
@@ -74,165 +259,6 @@ def counter_inc_fn(name):
 
 def get_counter_inc_fn(counter_name):
   return counter_inc_fn
-
-
-def is_javascript_code(text):
-    # Count occurrences of specific characters
-    count_open_parenthesis = text.count('(')
-    count_close_parenthesis = text.count(')')
-    count_dollar_sign = text.count('$')
-    count_semicolon = text.count(';')
-    count_equals = text.count('=')
-    count_equals = text.count('{')
-    count_equals = text.count('}')
-    count_equals = text.count('+')
-    count_equals = text.count('_')
-    count_equals = text.count("'")
-    count_equals = text.count('"')
-    count_equals = text.count('#')
-    count_equals = text.count('/')
-    
-    # Calculate the total number of characters
-    total_characters = len(text)
-    
-    # Calculate the total count of specific characters
-    total_count = (count_open_parenthesis + count_close_parenthesis +
-                   count_dollar_sign + count_semicolon + count_equals)
-    
-    # Calculate the percentage of the total count relative to the total characters
-    percentage_total_count = (total_count / total_characters) * 100
-    
-    # Check if the percentage exceeds 8%
-    if percentage_total_count > 8:
-        return True
-    else:
-        return False
-
-
-def contains_arabic(text):
-    # Regular expression pattern to match Arabic characters
-    arabic_pattern = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+')
-    
-    # Check if the pattern matches the text
-    if arabic_pattern.search(text):
-        return True
-    else:
-        return False
-
-
-def clean_page(
-    page: PageFeatures,
-    citation_regex=re.compile(r"\[\d*\]|\[edit\]|\[citation needed\]"),
-    counter_inc_fn=None,
-    min_words_per_line=_MIN_WORDS_PER_LINE,
-    min_num_sentences=_MIN_NUM_SENTENCES,
-    max_word_length=_MAX_WORD_LENGTH,
-    line_delimiter="\n",
-    only_arabic=False,
-    debug=False
-) -> Iterable[PageFeatures]:
-  """Cleans a CommonCrawl page, yielding nothing if it should be skipped.
-
-  Cleaning removes lines with no end marks or with too few words. After line
-  filtering, pages are filtered out if they have too few sentences based on a
-  simple count of end marks.
-
-  Args:
-    page: the features of the page.
-    citation_regex: Regex to use for finding Wikipedia-like citations to filter.
-    counter_inc_fn: function, a function taking the name of a counter to be
-      incremented and the (optional) amount. Defaults to a beam Metric counter.
-    min_words_per_line: int, the minimum number of words a line needs to not be
-      removed.
-    min_num_sentences: int, the minimum number of sentences a page needs to not
-      be skipped.
-    max_word_length: int, the maximum number of characters allowed in a word.
-      Lines containing a word with too many characters are removed.
-    line_delimiter: str, the delimiter used to separate and join lines.
-    only_arabic: bool, keep only lines includes Arabic characters (not necessarily exclusively Arabic)
-
-  Yields:
-    The url and cleaned text for the page.
-  """
-  text = page.text
-
-  if not counter_inc_fn:
-    counter_inc_fn = get_counter_inc_fn("clean-page")
-
-  if debug:
-    def stderr_print(*args, **kwargs):
-      print(*args, **kwargs, file=sys.stderr)
-    counter_inc_fn = stderr_print
-
-  lines = text.splitlines()
-  valid_lines = []
-  num_sentences = 0
-
-  def line_is_arabic(line):
-    return contains_arabic(line)
-
-  def line_is_code(line):
-    return is_javascript_code(line)
-
-  def line_is_copyright(line):
-    return '©' in line
-
-  def line_has_too_long_word(line):
-    for word in line.split():
-      if len(word) > max_word_length:
-        return True
-    return False
-
-  for line in lines:
-    line = line.strip()
-    if debug:
-      print(">>>", line, file=sys.stderr)
-    if only_arabic and not line_is_arabic(line):
-      counter_inc_fn("line-filtered:not_arabic")
-      continue
-    if line_has_too_long_word(line):
-      counter_inc_fn("line-filtered:too_long_word")
-      continue
-    if line_is_code(line):
-      counter_inc_fn("line-filtered:code")
-      continue
-    line = citation_regex.sub("", line)
-    if not line.endswith(_END_MARKS) or line.endswith(_ELLIPSIS):
-      counter_inc_fn("line-filtered:no_endmark")
-      continue
-    if len(line.split()) < min_words_per_line:
-      counter_inc_fn("line-filtered:too_short")
-      continue
-    line_lower = line.lower()
-    # Remove documents which contain lorem ipsum
-    if "lorem ipsum" in line_lower:
-      counter_inc_fn("filtered:loremipsum")
-      return
-    # Remove "javascript must be enabled" notices
-    if "javascript" in line_lower:
-      counter_inc_fn("line-filtered:javascript")
-      continue
-    # Remove docs which probably contain javascript code
-    if "{" in line:
-      counter_inc_fn("filtered:squigglybracket")
-      continue
-    # Remove copyrights
-    if "©" in line:
-      counter_inc_fn("filtered:copyright")
-      continue
-    # Remove policy lines
-    if any(p in line_lower for p in _POLICY_SUBSTRINGS):
-      counter_inc_fn("line-filtered:policy")
-      continue
-    # num_sentences += len(_get_sentences(line))
-    valid_lines.append(line)
-    counter_inc_fn("line-passed")
-
-  # if num_sentences < min_num_sentences:
-  #   counter_inc_fn("filtered:too_few_sentences")
-  #   return
-  counter_inc_fn("passed")
-  return dataclasses.replace(page, text=line_delimiter.join(valid_lines).strip())
 
 
 def get_hashed_url_filter_fn(predicate_fn):
@@ -297,78 +323,22 @@ def get_badwords_filter_fn(badwords, filter_fraction: float = 1.0):
 def process(args):
 
   badwords = load_badwords()
-  badwords_filter = get_badwords_filter_fn(badwords, filter_fraction=0.999)
 
-  stats = collections.defaultdict(lambda: 0)
+  pipeline = Pipeline([
+    NormalizeUrlProcessor(),
+    BadUrlFilter(),
+    CleanTextProcessor(),
+    # BadWordsFilter(badwords=badwords)
+  ], debug=args.debug)
 
-  for json_line in fileinput.input(files=("-"), encoding="utf-8"):
-    page = PageFeatures(**json.loads(json_line))
+  def pages():
+    for json_line in fileinput.input(files=("-"), encoding="utf-8"):
+      yield PageFeatures(**json.loads(json_line))
 
-    if args.debug_url and page.url != args.debug_url:
-      continue
+  for page in pipeline(pages()):
+    print(json.dumps(dataclasses.asdict(page, dict_factory=lambda x: {k: v for (k, v) in x if v is not None}), ensure_ascii=False), file=sys.stdout)
 
-    stats['total'] += 1
-
-    url = page.url
-
-    if 'porn' in page.url:
-      print("*** [", url, "] SKIPPED porn in url", file=sys.stderr)
-      continue
-
-    if 'video' in page.url:
-      print("*** [", url, "] SKIPPED video in url", file=sys.stderr)
-      continue
-
-    if args.clean:
-      page = clean_page(page, only_arabic=args.only_arabic, debug=args.debug_clean)
-      if not page:
-        stats['empty_after_clean'] += 1
-        if args.debug:
-          print("*** [", url, "] SKIPPED no text after cleaning", file=sys.stderr)
-        continue
-
-    if args.length_filter and not c4_utils.is_valid_length(page):
-      if args.debug:
-        stats['invalid_length'] += 1
-        print("*** [", page.url, "] SKIPPED text is too long", file=sys.stderr)
-      continue
-
-    # url dedupe, choose newest page for same url (not applicable)
-
-    if args.paragraph_filter and not c4_utils.paragraph_filter(page, min_paragraphs=args.min_paragraphs, min_paragraph_len=args.min_paragraph_len):
-      stats['paragraph_filter'] += 1
-      if args.debug:
-        print("*** [", page.url, "] SKIPPED paragraphs <", args.min_paragraphs, " or paragraph length < ", args.min_paragraph_len, file=sys.stderr)
-      continue
-
-    # # language
-    # if args.lang_detect:
-    #   page = langdetect.process(page)
-    #   if not page:
-    #     if args.debug:
-    #       print("*** [", page.url, "] SKIPPED text is not Arabic")
-    #     continue
-
-    if args.badwords_filter and not badwords_filter(page):
-      stats['badwords_filter'] += 1
-      if args.debug:
-        print("*** [", page.url, "] SKIPPED text contains bad words", file=sys.stderr)
-      continue
-
-    stats['passed'] += 1
-
-    if args.add_word_count:
-      page.word_count = len(page.text.split())
-      stats['total_word_count'] += page.word_count
-
-      if args.debug_url and page.url == args.debug_url:
-        break
-
-    if page.text:
-      print(json.dumps(dataclasses.asdict(page), ensure_ascii=False), file=sys.stdout)
-
-  print(json.dumps(stats, indent=4), file=sys.stderr)
-
+    
 if __name__ == '__main__':
   import argparse
 
