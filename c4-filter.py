@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+import heapq
 import logging
 import fileinput
 import dataclasses
@@ -247,6 +248,20 @@ class BadWordsFilter(Filter):
     return self.filter(page)
 
 
+class C4ParagraphFilter(Filter):
+  def __init__(self, min_paragraphs=3, min_paragraph_len=200, line_delimiter="\n"):
+    super().__init__()
+    self.min_paragraphs = min_paragraphs
+    self.min_paragraph_len = min_paragraph_len
+    self.line_delimiter = line_delimiter
+
+  def should_pass(self, page):
+    lines = page.text.split(line_delimiter)
+    if len(lines) < self.min_paragraphs or \
+      min(heapq.nlargest(3, [len(l) for l in lines])) < self.min_paragraph_len:
+      return False
+    return True
+
 
 line_delimiter = '\n'
 
@@ -328,7 +343,8 @@ def process(args):
     NormalizeUrlProcessor(),
     BadUrlFilter(),
     CleanTextProcessor(),
-    # BadWordsFilter(badwords=badwords)
+    C4ParagraphFilter(), 
+    BadWordsFilter(badwords=badwords),
   ], debug=args.debug)
 
   def pages():
