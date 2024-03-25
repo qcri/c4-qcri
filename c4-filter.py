@@ -3,7 +3,6 @@ import re
 import sys
 import json
 import heapq
-import logging
 import fileinput
 import dataclasses
 import hashlib
@@ -11,7 +10,7 @@ import collections
 from typing import Optional, Any
 
 
-_SCRIPT_DIR=os.path.dirname(os.path.realpath(__file__))
+_SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 # Filters
@@ -105,7 +104,7 @@ class NormalizeUrlProcessor(Processor):
     url = re.sub(r"https?:\/\/(www\.)?", "", url)
     url = re.sub(r"\?(utm_|ref|feed).*", "", url)
     url = url.rstrip("/")
-    page.url = url
+    page.normalized_url = url
 
 
 class WordCountProcessor(Processor):
