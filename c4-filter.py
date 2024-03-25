@@ -83,11 +83,8 @@ class Pipeline:
     self.debug = debug
 
   def __call__(self, dataset):
-    print("Pipeline.__call__")
     for page in dataset:
       for module in self.modules:
-        if self.debug:
-          print(f"{module} {page}")
         new_page = module(page)
         if new_page is None:
           if self.debug:
