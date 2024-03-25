@@ -118,6 +118,11 @@ class WordCountProcessor(Processor):
 class CleanTextProcessor(Processor):
   def __init__(self):
     super().__init__()
+    self.citation_regex = re.compile(r"\[\d*\]|\[edit\]|\[citation needed\]")
+    self.min_words_per_line = _MIN_WORDS_PER_LINE
+    self.min_num_sentences = _MIN_NUM_SENTENCES
+    self.max_word_length = _MAX_WORD_LENGTH
+    self.line_delimiter = "\n"
 
   @staticmethod
   def line_is_copyright(text):
@@ -173,8 +178,25 @@ class CleanTextProcessor(Processor):
 
     valid_lines = []
 
+    def line_has_too_long_word(line):
+      for word in line.split():
+        if len(word) > max_word_length:
+          return True
+      return False
+
     for line in lines:
       line = line.strip()
+      line = self.citation_regex.sub("", line)
+
+      if line_has_too_long_word(line):
+        continue
+
+      if not line.endswith(_END_MARKS) or line.endswith(_ELLIPSIS):
+        counter_inc_fn("line-filtered:no_endmark")
+        continue
+      if len(line.split()) < min_words_per_line:
+        counter_inc_fn("line-filtered:too_short")
+        continue
 
       if CleanTextProcessor.line_is_javascript_code(line):
         continue
@@ -217,8 +239,8 @@ class BadUrlFilter(Filter):
 
   def should_pass(self, page):
     if self.regex.search(page.url.lower()):
-      return True
-    return False
+      return False
+    return True
 
 
 class LengthFilter(Filter):
