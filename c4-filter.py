@@ -180,7 +180,7 @@ class CleanTextProcessor(Processor):
 
     def line_has_too_long_word(line):
       for word in line.split():
-        if len(word) > max_word_length:
+        if len(word) > self.max_word_length:
           return True
       return False
 
@@ -194,7 +194,7 @@ class CleanTextProcessor(Processor):
       if not line.endswith(_END_MARKS) or line.endswith(_ELLIPSIS):
         counter_inc_fn("line-filtered:no_endmark")
         continue
-      if len(line.split()) < min_words_per_line:
+      if len(line.split()) < self.min_words_per_line:
         counter_inc_fn("line-filtered:too_short")
         continue
 
