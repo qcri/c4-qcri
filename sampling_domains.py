@@ -26,7 +26,9 @@ for i, line in enumerate(fileinput.input(files=("-"), encoding="utf-8")):
   count = page.get('domain_count', 1)
   domains.update({domain: count})
 
-  if len(samples[domain]) < NSAMPLES and page['language'].startswith("ara"):
+  if len(samples[domain]) < NSAMPLES and \
+    page['text'] and \
+    page['language'].startswith("ara"):
     samples[domain].append({'domain': domain, **page})
 
 for domain, count in domains.most_common():
