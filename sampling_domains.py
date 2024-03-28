@@ -34,7 +34,8 @@ for i, line in enumerate(fileinput.input(files=("-"), encoding="utf-8")):
     if len(samples[domain]) < NSAMPLES:
       samples[domain].append({'domain': domain, **page})
     elif domains[domain] % 100 == 1:
-      samples[domain][random.randint(NSAMPLES)] = {'domain': domain, **page}
+      samples[domain].pop(0)
+      samples[domain].append({'domain': domain, **page})
 
 
 for domain, count in domains.most_common():
