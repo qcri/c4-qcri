@@ -10,10 +10,10 @@ from urllib.parse import urlparse
 
 def domain_of(url):
   parts = urlparse(url)
-  netloc = parts.netloc or parts.path
-  return netloc
+  hostname = parts.hostname or parts.path
+  return hostname
 
-NSAMPLES = 10
+NSAMPLES = 20
 
 domains = Counter()
 samples = defaultdict(list)
@@ -30,13 +30,11 @@ for i, line in enumerate(fileinput.input(files=("-"), encoding="utf-8")):
   if page['text'] and \
     page['language'].startswith("ara"):
 
+    # 
     if len(samples[domain]) < NSAMPLES:
       samples[domain].append({'domain': domain, **page})
-    elif domains[domain] < 100:
-        samples[domain].pop(0)
-        samples[domain].append({'domain': domain, **page})
-    elif domains[domain] % 1000 == 1:
-      samples[random.randint(NSAMPLES)] = {'domain': domain, **page}
+    elif domains[domain] % 100 == 1:
+      samples[domain][random.randint(NSAMPLES)] = {'domain': domain, **page}
 
 
 for domain, count in domains.most_common():
