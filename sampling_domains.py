@@ -33,7 +33,7 @@ for i, line in enumerate(fileinput.input(files=("-"), encoding="utf-8")):
     # 
     if len(samples[domain]) < NSAMPLES:
       samples[domain].append({'domain': domain, **page})
-    elif domains[domain] % 100 == 1:
+    elif random.randint(0, 10) == 1:
       samples[domain].pop(0)
       samples[domain].append({'domain': domain, **page})
 
