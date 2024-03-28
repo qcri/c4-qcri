@@ -3,6 +3,7 @@
 
 import sys
 import json
+import random
 import fileinput
 from collections import Counter, defaultdict
 from urllib.parse import urlparse
@@ -26,10 +27,17 @@ for i, line in enumerate(fileinput.input(files=("-"), encoding="utf-8")):
   count = page.get('domain_count', 1)
   domains.update({domain: count})
 
-  if len(samples[domain]) < NSAMPLES and \
-    page['text'] and \
+  if page['text'] and \
     page['language'].startswith("ara"):
-    samples[domain].append({'domain': domain, **page})
+
+    if len(samples[domain]) < NSAMPLES:
+      samples[domain].append({'domain': domain, **page})
+    elif domains[domain] < 100:
+        samples[domain].pop(0)
+        samples[domain].append({'domain': domain, **page})
+    elif domains[domain] % 1000 == 1:
+      samples[random.randint(NSAMPLES)] = {'domain': domain, **page}
+
 
 for domain, count in domains.most_common():
   for page in samples.get(domain, []):
