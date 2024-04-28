@@ -94,7 +94,7 @@ if not os.path.exists(wet_file_path):
 
 @lru_cache
 def lazy_gzip_open():
-  return gzip.open(wet_file_path[:-len('gz')]+"pages.jsons.gz", "wt", encoding="utf8")
+  return gzip.open(wet_file_path[:-len('gz')]+"pages.jsonl.gz", "wt", encoding="utf8")
 
 total = 0
 count = 0

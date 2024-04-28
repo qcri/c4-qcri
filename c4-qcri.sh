@@ -42,7 +42,7 @@ function download_and_parse {
     BASENAME=$(basename $WETPATH)
     SUBDIR=${BASENAME%-*}
     DOWNLOADED="$SUBDIR/$BASENAME"
-    GZOUTPUT="${DOWNLOADED%gz}ara.jsonl.gz"
+    GZOUTPUT="${DOWNLOADED%gz}pages.jsonl.gz"
 
     mkdir -p $SUBDIR
     
@@ -80,19 +80,12 @@ export -f download_and_parse
 
 CC_VERSIONS=(
   $(basename $(pwd))
-# "2022-33"
-#  "2022-40"
-#  "2022-49"
-#  "2023-06"
-#  "2023-14"
-#  "2023-23"
-#  "2023-40"
-#  "2023-50"
 )
 
 
 DOWNLOAD_HOST="https://data.commoncrawl.org"
 WET_PATH_URL="https://data.commoncrawl.org/crawl-data/CC-MAIN-CC-VERSION/wet.paths.gz"
+PATHS_LST="paths.lst"
 
 date '+%Y-%m-%d %H:%M:%S'
 
@@ -107,7 +100,7 @@ done
 
 mkdir -p run
 
-if [ ! -s "download_and_split/input.txt" ]; then
+if [ ! -s "$PATHS_LST" ]; then
     for CC_VERSION in "${CC_VERSIONS[@]}";
     do
         if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -115,10 +108,10 @@ if [ ! -s "download_and_split/input.txt" ]; then
         else
             zcat wet.paths/${CC_VERSION}.wet.paths.gz
         fi
-    done >> run/input.txt
+    done >> "$PATHS_LST"
 fi
 
 
-parallel --joblog run/download_and_parse.log -j $(nproc) -a run/input.txt download_and_parse
+parallel --joblog run/download_and_parse.log -j $(nproc) -a "$PATHS_LST" download_and_parse
 
 date '+%Y-%m-%d %H:%M:%S'
