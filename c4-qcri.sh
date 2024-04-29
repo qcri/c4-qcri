@@ -114,4 +114,9 @@ fi
 
 parallel --joblog run/download_and_parse.log -j $(nproc) -a "$PATHS_LST" download_and_parse
 
+for CC_MAIN_DIR in CC-MAIN-*; do
+    cat $CC_MAIN_DIR/*.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
+    rm -rf $CC_MAIN_DIR
+done
+
 date '+%Y-%m-%d %H:%M:%S'
