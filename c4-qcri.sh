@@ -38,10 +38,11 @@ export -f wget_until_success
 
 function download_and_parse {
     WETPATH=$1
+    OUTDIR=$2
 
     # download wet file
     BASENAME=$(basename $WETPATH)
-    SUBDIR=${BASENAME%-*}
+    SUBDIR=${OUTDIR}/${BASENAME%-*}
     DOWNLOADED="$SUBDIR/$BASENAME"
     GZOUTPUT="${DOWNLOADED%gz}pages.jsonl.gz"
 
@@ -105,7 +106,7 @@ if [ ! -s "$PATHS_LST" ]; then
     fi
 fi
 
-parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse
+parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse {} ${CC_VERSION}
 
 for CC_MAIN_DIR in $CC_VERSION/CC-MAIN-*; do
     cat $CC_MAIN_DIR/*.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
