@@ -77,12 +77,14 @@ function download_and_parse {
 
 export -f download_and_parse
 
+CC_VERSION=$1
 
 DOWNLOAD_HOST="https://data.commoncrawl.org"
 WET_PATH_URL="https://data.commoncrawl.org/crawl-data/CC-MAIN-CC-VERSION/wet.paths.gz"
 PATHS_LST="paths.lst"
 
 date '+%Y-%m-%d %H:%M:%S'
+
 
 mkdir -p wet.paths
 
@@ -95,14 +97,11 @@ mkdir -p $CC_VERSION
 PATHS_LST=${CC_VERSION}/paths.lst
 
 if [ ! -s "$PATHS_LST" ]; then
-    for CC_VERSION in "${CC_VERSIONS[@]}";
-    do
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            gzcat wet.paths/${CC_VERSION}.wet.paths.gz
-        else
-            zcat wet.paths/${CC_VERSION}.wet.paths.gz
-        fi
-    done >> "$PATHS_LST"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        gzcat wet.paths/${CC_VERSION}.wet.paths.gz > $PATHS_LST
+    else
+        zcat wet.paths/${CC_VERSION}.wet.paths.gz > $PATHS_LST
+    fi
 fi
 
 parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse
