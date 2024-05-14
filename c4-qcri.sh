@@ -9,6 +9,7 @@
 # by Yifan Zhang (yzhang@hbku.edu.qa)
 # Copyright (C) 2024, Qatar Computing Research Institute
 
+export SCRIPT_DIR=$(dirname "$0")
 
 # to clean up and terminate child processes
 function cleanup {
@@ -64,7 +65,7 @@ function download_and_parse {
             echo "Downloading failed"
             return 1
         else 
-            python3 split_wet_file.py "$DOWNLOADED"
+            python3 $SCRIPT_DIR/split_wet_file.py "$DOWNLOADED"
         fi
     fi
 
