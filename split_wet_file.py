@@ -101,7 +101,7 @@ count = 0
 
 for page in split_pages(wet_file_path):
   total += 1
-  if page.language and 'ara' in page.language.split(','):
+  if page.language and page.language.startswith('ara'):
     count += 1
     lazy_gzip_open().write(json.dumps(dataclasses.asdict(page), ensure_ascii=False) + "\n")
 

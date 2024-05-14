@@ -78,11 +78,6 @@ function download_and_parse {
 export -f download_and_parse
 
 
-CC_VERSIONS=(
-  $(basename $(pwd))
-)
-
-
 DOWNLOAD_HOST="https://data.commoncrawl.org"
 WET_PATH_URL="https://data.commoncrawl.org/crawl-data/CC-MAIN-CC-VERSION/wet.paths.gz"
 PATHS_LST="paths.lst"
@@ -90,15 +85,14 @@ PATHS_LST="paths.lst"
 date '+%Y-%m-%d %H:%M:%S'
 
 mkdir -p wet.paths
-for CC_VERSION in "${CC_VERSIONS[@]}";
-do
-    if [[ ! -s "wet.paths/${CC_VERSION}.wet.paths.gz" ]]; then
-        wget -q -O wet.paths/${CC_VERSION}.wet.paths.gz ${WET_PATH_URL/CC-VERSION/${CC_VERSION}}
-    fi
-done
 
+if [[ ! -s "wet.paths/${CC_VERSION}.wet.paths.gz" ]]; then
+    wget -q -O wet.paths/${CC_VERSION}.wet.paths.gz ${WET_PATH_URL/CC-VERSION/${CC_VERSION}}
+fi
 
-mkdir -p run
+mkdir -p $CC_VERSION
+
+PATHS_LST=${CC_VERSION}/paths.lst
 
 if [ ! -s "$PATHS_LST" ]; then
     for CC_VERSION in "${CC_VERSIONS[@]}";
@@ -111,12 +105,10 @@ if [ ! -s "$PATHS_LST" ]; then
     done >> "$PATHS_LST"
 fi
 
+parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse
 
-parallel --joblog run/download_and_parse.log -j $(nproc) -a "$PATHS_LST" download_and_parse
-
-for CC_MAIN_DIR in CC-MAIN-*; do
+for CC_MAIN_DIR in $CC_VERSION/CC-MAIN-*; do
     cat $CC_MAIN_DIR/*.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
-    rm -rf $CC_MAIN_DIR
 done
 
-date '+%Y-%m-%d %H:%M:%S'
+date 'Finished at +%Y-%m-%d %H:%M:%S'
