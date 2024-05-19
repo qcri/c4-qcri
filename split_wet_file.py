@@ -7,6 +7,7 @@ import logging
 import dataclasses
 from functools import lru_cache
 from typing import Optional
+from ftlangdetect import detect
 
 
 # WET file constants
@@ -100,9 +101,28 @@ total = 0
 count = 0
 
 for page in split_pages(wet_file_path):
+  keep = False
   total += 1
-  if page.language and page.language.startswith('ara'):
-    count += 1
+  if page.language:
+    if page.language.startswith('ara'):
+      keep = True
+      count += 1
+  else:
+    lines = sorted(page.text.split("\n"), key=lambda x: len(x), reverse=True)
+    selected = []
+    length = 0
+    total = sum(map(lambda x: len(x), lines))
+    while length / total < 0.5:
+      this_line = lines.pop(0)
+      selected.append(this_line)
+      length += len(this_line)
+
+    result = detect(text=" ".join(selected))
+
+    if result['lang'] == 'ar':  
+      keep = True
+
+  if keep:
     lazy_gzip_open().write(json.dumps(dataclasses.asdict(page), ensure_ascii=False) + "\n")
 
 logging.info("%d/%d extracted", count, total)
