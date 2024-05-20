@@ -33,6 +33,7 @@ class PageFeatures:
   content_length: str = ""
   content_type: str = ""
   language: Optional[str] = None
+  langdetect: Optional[dict] = None
 
 
 def normalize_url(url):
@@ -122,6 +123,7 @@ for page in split_pages(wet_file_path):
       length += len(this_line)
 
     result = detect(text=" ".join(selected))
+    page.langdetect = result
 
     if result['lang'] == 'ar':  
       keep = True
