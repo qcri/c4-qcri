@@ -7,7 +7,11 @@ import logging
 import dataclasses
 from functools import lru_cache
 from typing import Optional
+import fasttext
 from ftlangdetect import detect
+
+# fix fasttext warning message
+fasttext.FastText.eprint = lambda x: None
 
 
 # WET file constants
