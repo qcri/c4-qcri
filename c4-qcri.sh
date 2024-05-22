@@ -109,7 +109,7 @@ fi
 parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse {} ${CC_VERSION}
 
 for CC_MAIN_DIR in $CC_VERSION/CC-MAIN-*; do
-    cat $CC_MAIN_DIR/*.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
+    cat $CC_MAIN_DIR/*.pages.jsonl.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
 done
 
 date 'Finished at +%Y-%m-%d %H:%M:%S'
