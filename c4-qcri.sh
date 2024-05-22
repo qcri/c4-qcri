@@ -107,8 +107,12 @@ if [ ! -s "$PATHS_LST" ]; then
     fi
 fi
 
-DUMMY=$(which parallel)
-if [[ $? -eq 1 ]]; then
+set +e
+which parallel
+NO_PARALLEL=$?
+set -e
+
+if [[ $NO_PARALLEL -eq 1 ]]; then
     cat $PATHS_LST | xargs -I '{}' -P $NJOBS download_and_parse {} ${CC_VERSION}
 else
     parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse {} ${CC_VERSION}
