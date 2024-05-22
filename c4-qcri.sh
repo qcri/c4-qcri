@@ -107,7 +107,7 @@ if [ ! -s "$PATHS_LST" ]; then
     fi
 fi
 
-which parallel
+DUMMY=$(which parallel)
 if [[ $? -eq 1 ]]; then
     cat $PATHS_LST | xargs -I '{}' -P $NJOBS download_and_parse {} ${CC_VERSION}
 else
