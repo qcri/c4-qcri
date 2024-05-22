@@ -80,6 +80,7 @@ function download_and_parse {
 export -f download_and_parse
 
 CC_VERSION=$1
+NJOBS=${2-32}
 
 DOWNLOAD_HOST="https://data.commoncrawl.org"
 WET_PATH_URL="https://data.commoncrawl.org/crawl-data/CC-MAIN-CC-VERSION/wet.paths.gz"
@@ -106,7 +107,12 @@ if [ ! -s "$PATHS_LST" ]; then
     fi
 fi
 
-parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse {} ${CC_VERSION}
+which parallel
+if [[ $? -eq 1 ]]; then
+    cat $PATHS_LST | xargs -I '{}' -P $NJOBS download_and_parse {} ${CC_VERSION}
+else
+    parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse {} ${CC_VERSION}
+fi
 
 for CC_MAIN_DIR in $CC_VERSION/CC-MAIN-*; do
     cat $CC_MAIN_DIR/*.pages.jsonl.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
@@ -115,4 +121,4 @@ done
 TOTAL_GZ=$(find $CC_VERSION -name 'CC-MAIN-*' -type d | xargs -I '{}' find {} -name "*.pages.jsonl.gz" | wc -l)
 echo "$TOTAL_GZ .pages.jsonl.gz generated from" $(wc -l $PATHS_LST) "entries"
 
-date 'Finished at +%Y-%m-%d %H:%M:%S'
+echo "Finished at " $(date '+%Y-%m-%d %H:%M:%S')
