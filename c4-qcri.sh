@@ -113,7 +113,7 @@ NO_PARALLEL=$?
 set -e
 
 if [[ $NO_PARALLEL -eq 1 ]]; then
-    cat $PATHS_LST | xargs -I '{}' -P $NJOBS download_and_parse {} ${CC_VERSION}
+    cat $PATHS_LST | xargs -I '{}' -P $NJOBS bash -c 'download_and_parse "$@"' _ {} ${CC_VERSION}
 else
     parallel --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse {} ${CC_VERSION}
 fi
