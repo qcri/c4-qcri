@@ -112,4 +112,7 @@ for CC_MAIN_DIR in $CC_VERSION/CC-MAIN-*; do
     cat $CC_MAIN_DIR/*.pages.jsonl.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
 done
 
+TOTAL_GZ=$(find $CC_VERSION -name 'CC-MAIN-*' -type d | xargs -I '{}' find {} -name "*.pages.jsonl.gz" | wc -l)
+echo "$TOTAL_GZ .pages.jsonl.gz generated from" $(wc -l $PATHS_LST) "entries"
+
 date 'Finished at +%Y-%m-%d %H:%M:%S'
