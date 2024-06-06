@@ -118,11 +118,18 @@ else
     parallel --retries 10 --halt now,fail=1 --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse {} ${CC_VERSION}
 fi
 
-find $CC_VERSION -name "CC-MAIN-*" -type d | while read CC_MAIN_DIR; do
-    cat $CC_MAIN_DIR/*.pages.jsonl.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
-done
+# check if all download was okay
+EXPECTED_NUM_FILES=$(wc -l $PATH_LST)
+ACTUAL_NUM_FILES=$(find $CC_VERSION -name "*.pages.jsonl.gz" | wc -l)
+if [[ $ACTUAL_NUM_FILES -lt $EXPECTED_NUM_FILES ]]; then
+    echo "Expecting ${EXPECTED_NUM_FILES} files only got ${ACTUAL_NUM_FILES}"
+else
+    find $CC_VERSION -name "CC-MAIN-*" -type d | while read CC_MAIN_DIR; do
+        cat $CC_MAIN_DIR/*.pages.jsonl.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
+    done
 
-TOTAL_GZ=$(find $CC_VERSION -name 'CC-MAIN-*' -type d | xargs -I '{}' find {} -name "*.pages.jsonl.gz" | wc -l)
-echo "$TOTAL_GZ .pages.jsonl.gz generated from" $(wc -l $PATHS_LST) "entries"
+    TOTAL_GZ=$(find $CC_VERSION -name 'CC-MAIN-*' -type d | xargs -I '{}' find {} -name "*.pages.jsonl.gz" | wc -l)
+    echo "$TOTAL_GZ .pages.jsonl.gz generated from" $(wc -l $PATHS_LST) "entries"
+fi
 
 echo "Finished at " $(date '+%Y-%m-%d %H:%M:%S')
