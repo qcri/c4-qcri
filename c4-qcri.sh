@@ -118,7 +118,7 @@ else
     parallel --retries 10 --halt now,fail=1 --joblog $CC_VERSION/jobs.log -j $(nproc) -a "$PATHS_LST" download_and_parse {} ${CC_VERSION}
 fi
 
-for CC_MAIN_DIR in $CC_VERSION/CC-MAIN-*; do
+find $CC_VERSION -name "CC-MAIN-*" -type d | while read CC_MAIN_DIR; do
     cat $CC_MAIN_DIR/*.pages.jsonl.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
 done
 
