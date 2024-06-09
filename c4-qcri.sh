@@ -119,7 +119,7 @@ else
 fi
 
 # check if all download was okay
-EXPECTED_NUM_FILES=$(wc -l $PATHS_LST)
+EXPECTED_NUM_FILES=$(cat $PATHS_LST | wc -l)
 ACTUAL_NUM_FILES=$(ls $CC_VERSION/*/*.pages.jsonl.gz | wc -l)
 if [[ $ACTUAL_NUM_FILES -lt $EXPECTED_NUM_FILES ]]; then
     echo "Expecting ${EXPECTED_NUM_FILES} files only got ${ACTUAL_NUM_FILES}"
