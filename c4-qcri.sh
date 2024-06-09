@@ -123,13 +123,13 @@ EXPECTED_NUM_FILES=$(cat $PATHS_LST | wc -l)
 ACTUAL_NUM_FILES=$(ls $CC_VERSION/*/*.pages.jsonl.gz | wc -l)
 if [[ $ACTUAL_NUM_FILES -lt $EXPECTED_NUM_FILES ]]; then
     echo "Expecting ${EXPECTED_NUM_FILES} files only got ${ACTUAL_NUM_FILES}"
+    echo "Stopped at " $(date '+%Y-%m-%d %H:%M:%S')
 else
     find $CC_VERSION -name "CC-MAIN-*" -type d | while read CC_MAIN_DIR; do
         cat $CC_MAIN_DIR/*.pages.jsonl.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
     done
 
-    TOTAL_GZ=$(find $CC_VERSION -name 'CC-MAIN-*' -type d | xargs -I '{}' find {} -name "*.pages.jsonl.gz" | wc -l)
-    echo "$TOTAL_GZ .pages.jsonl.gz generated from" $(wc -l $PATHS_LST) "entries"
+    echo "Generated $ACTUAL_NUM_FILES Expected $EXPECTED_NUM_FILES"
+    echo "Successfully finished at " $(date '+%Y-%m-%d %H:%M:%S')
 fi
 
-echo "Finished at " $(date '+%Y-%m-%d %H:%M:%S')
