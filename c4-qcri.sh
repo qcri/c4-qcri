@@ -54,7 +54,7 @@ function download_and_parse {
     # download wet file
     BASENAME=$(basename $WETPATH)
     SUBDIR=${OUTDIR}/${BASENAME:0:22}
-    UNIQNAME=$(extract_unique_name $WEBPATH)
+    UNIQNAME=$(extract_unique_name $WETPATH)
     DOWNLOADED="$SUBDIR/$UNIQNAME"
     GZOUTPUT="${DOWNLOADED%gz}pages.jsonl.gz"
 
