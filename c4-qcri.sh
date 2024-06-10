@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 # c4-qcri.sh
 # QCRI's script to download and clean Arabic data from CommonCrawl. It does
