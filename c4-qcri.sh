@@ -35,6 +35,17 @@ function wget_until_success {
 
 export -f wget_until_success
 
+function extract_unique_name {
+    WETPATH=$1
+
+    UNIQNAME=${WETPATH#*segments/}
+    UNIQNAME=${UNIQNAME//\//-}
+
+    echo $UNIQNAME
+}
+
+export -f extract_unique_name
+
 
 function download_and_parse {
     WETPATH=$1
@@ -43,11 +54,12 @@ function download_and_parse {
     # download wet file
     BASENAME=$(basename $WETPATH)
     SUBDIR=${OUTDIR}/${BASENAME:0:22}
-    DOWNLOADED="$SUBDIR/$BASENAME"
+    UNIQNAME=$(extract_unique_name $WEBPATH)
+    DOWNLOADED="$SUBDIR/$UNIQNAME"
     GZOUTPUT="${DOWNLOADED%gz}pages.jsonl.gz"
 
     mkdir -p $SUBDIR
-    
+
     # if we have downloaded wet file, we probably didn't finish
     # previous job, it is better to remove both output file and
     # redo this particular file
@@ -110,6 +122,14 @@ if [ ! -s "$PATHS_LST" ]; then
     else
         zcat wet.paths/${CC_VERSION}.wet.paths.gz > $PATHS_LST
     fi
+fi
+
+# verify that we don't have filename collision
+NUM_NAMES=$(cat $PATHS_LST | xargs -n 1 extract_unique_name | sort | uniq | wc -l)
+if [ $(cat $PATHS_LST | wc -l) -ne $NUM_NAMES ]; then
+    echo "Failed because of naming collision before processing files, this could lead to"
+    echo "jobs overwrite others' output"
+    exit 1
 fi
 
 set +e
