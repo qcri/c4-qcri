@@ -65,8 +65,13 @@ function download_and_parse {
         if [ ! -s "$DOWNLOADED" ]; then
             echo "Downloading failed"
             return 1
-        else 
+        else
+            echo "$DOWNLOADED"
             python3 $SCRIPT_DIR/split_wet_file.py "$DOWNLOADED"
+            if [ $? -ne 0 ]; then
+                ls -lh $DOWNLOADED
+                echo "Failed on $DOWNLOADED"
+            fi
         fi
     fi
 
