@@ -145,7 +145,7 @@ fi
 
 # check if all download was okay
 EXPECTED_NUM_FILES=$(cat $PATHS_LST | wc -l)
-ACTUAL_NUM_FILES=$(ls $CC_VERSION/*/*.pages.jsonl.gz | wc -l)
+ACTUAL_NUM_FILES=$(find $CC_VERSION -name '*.pages.jsonl.gz' -depth 2 | wc -l)
 if [[ $ACTUAL_NUM_FILES -lt $EXPECTED_NUM_FILES ]]; then
     echo "Expecting ${EXPECTED_NUM_FILES} files only got ${ACTUAL_NUM_FILES}"
     echo "Stopped at " $(date '+%Y-%m-%d %H:%M:%S')
