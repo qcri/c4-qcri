@@ -78,11 +78,15 @@ function download_and_parse {
             echo "Downloading failed"
             return 1
         else
-            echo "$DOWNLOADED"
+            echo "$GZOUTPUT"
             python3 $SCRIPT_DIR/split_wet_file.py "$DOWNLOADED"
             if [ $? -ne 0 ]; then
                 ls -lh $DOWNLOADED
                 echo "Failed on $DOWNLOADED"
+            else
+                if [ ! -e "$GZOUTPUT" ]; then
+                    touch $GZOUTPUT
+                fi
             fi
         fi
     fi
