@@ -151,7 +151,7 @@ if [[ $ACTUAL_NUM_FILES -lt $EXPECTED_NUM_FILES ]]; then
     echo "Stopped at " $(date '+%Y-%m-%d %H:%M:%S')
 else
     find $CC_VERSION -name "CC-MAIN-*" -type d | while read CC_MAIN_DIR; do
-        cat $CC_MAIN_DIR/*.pages.jsonl.gz > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
+        find $CC_MAIN_DIR -name '*.pages.jsonl.gz' -exec cat {} + > ${CC_MAIN_DIR}.warc.wet.pages.jsonl.gz
     done
 
     echo "Generated $ACTUAL_NUM_FILES Expected $EXPECTED_NUM_FILES"
