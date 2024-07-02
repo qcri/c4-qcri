@@ -83,6 +83,10 @@ function download_and_parse {
             if [ $? -ne 0 ]; then
                 echo "file may be corrupted"
                 rm -f "$DOWNLOADED"
+                if grep -q "$WETPATH" $SCRIPT_DIR/corrupted.lst; then
+                    echo "found file in corrupted.lst, will skip and create empty output"
+                    touch $GZOUTPUT
+                fi
             else
                 echo "$GZOUTPUT"
                 python3 $SCRIPT_DIR/split_wet_file.py "$DOWNLOADED"
