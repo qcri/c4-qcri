@@ -93,6 +93,7 @@ function download_and_parse {
                 if [ $? -ne 0 ]; then
                     ls -lh $DOWNLOADED
                     echo "Failed on $DOWNLOADED"
+                    rm $DOWNLOADED
                 else
                     if [ ! -e "$GZOUTPUT" ]; then
                         touch $GZOUTPUT
